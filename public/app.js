@@ -1,4 +1,4 @@
-﻿const form = document.getElementById("scrape-form");
+const form = document.getElementById("scrape-form");
 const sourcesList = document.getElementById("sources-list");
 const statusEl = document.getElementById("status");
 const submitBtn = document.getElementById("submitBtn");
@@ -113,7 +113,17 @@ form.addEventListener("submit", async (event) => {
     resultSection.classList.remove("hidden");
     resultMeta.textContent = `Tổng cộng ${payload.count} bài viết. Nguồn: ${payload.meta.sources.join(", ")}. Định dạng: ${formatLabel}.`;
     resultPreview.textContent = formatPreview(payload.items, payload.format);
-    downloadLink.href = payload.fileUrl;
+
+    const binaryString = window.atob(payload.fileContentBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    const mimeType = payload.format === "csv" ? "text/csv" : "application/json";
+    const blob = new Blob([bytes], { type: mimeType });
+    const fileUrl = URL.createObjectURL(blob);
+
+    downloadLink.href = fileUrl;
     downloadLink.download = payload.fileName;
     downloadLink.textContent = payload.format === "csv" ? `Tải ${formatLabel}` : "Tải JSON";
 

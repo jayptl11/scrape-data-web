@@ -126,18 +126,13 @@ app.post("/api/scrape", async (req, res) => {
       formatLabel
     };
 
-    await fs.mkdir(OUTPUT_DIR, { recursive: true });
-
-    const fileName = `scrape_${uniqueSources.join("-")}_${sanitizeFilename(keyword)}_${startDate}_${endDate}_${Date.now()}.${outputFormat}`;
-    const filePath = path.join(OUTPUT_DIR, fileName);
-
+    let fileBuffer;
     if (outputFormat === "csv") {
       const csv = toCsv(exportItems);
-      const buffer = encodeCsv(csv, csvEncoding);
-      await fs.writeFile(filePath, buffer);
+      fileBuffer = encodeCsv(csv, csvEncoding);
     } else {
       const payload = { meta, items: exportItems };
-      await fs.writeFile(filePath, JSON.stringify(payload, null, 2), "utf8");
+      fileBuffer = Buffer.from(JSON.stringify(payload, null, 2), "utf8");
     }
 
     res.json({
@@ -146,15 +141,18 @@ app.post("/api/scrape", async (req, res) => {
       items: exportItems,
       format: outputFormat,
       formatLabel,
-      fileUrl: `/output/${fileName}`,
-      fileName,
-      filePath
+      fileContentBase64: fileBuffer.toString("base64"),
+      fileName
     });
   } catch (error) {
     res.status(500).json({ error: error.message || "Đã xảy ra lỗi." });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
