@@ -1,5 +1,4 @@
 const path = require("path");
-const fs = require("fs/promises");
 const express = require("express");
 const iconv = require("iconv-lite");
 const { sources, getSourceOptions } = require("./src/sources");
@@ -108,7 +107,10 @@ app.post("/api/scrape", async (req, res) => {
       if (formatKey === "csv-utf16") {
         csvEncoding = "utf16le-bom";
         formatLabel = "CSV (UTF-16LE)";
-      } else if (formatKey === "csv-utf8" || formatKey === "csv") {
+      } else if (formatKey === "csv") {
+        csvEncoding = "windows-1258";
+        formatLabel = "CSV (Excel ANSI)";
+      } else if (formatKey === "csv-utf8") {
         csvEncoding = "utf8-bom";
         formatLabel = "CSV (UTF-8)";
       }
@@ -125,6 +127,12 @@ app.post("/api/scrape", async (req, res) => {
       format: outputFormat,
       formatLabel
     };
+
+    const safeKeyword = sanitizeFilename(keyword.trim());
+    const safeSourcesLabel = sanitizeFilename(uniqueSources.join("-"));
+    const safeRange = sanitizeFilename(`${startDate || "start"}-${endDate || "end"}`);
+    const fileExt = outputFormat === "json" ? "json" : "csv";
+    const fileName = `${safeKeyword}_${safeSourcesLabel}_${safeRange}.${fileExt}`;
 
     let fileBuffer;
     if (outputFormat === "csv") {

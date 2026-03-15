@@ -117,7 +117,7 @@ form.addEventListener("submit", async (event) => {
     const binaryString = window.atob(payload.fileContentBase64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
+      bytes[i] = binaryString.charCodeAt(i);
     }
     const mimeType = payload.format === "csv" ? "text/csv" : "application/json";
     const blob = new Blob([bytes], { type: mimeType });
