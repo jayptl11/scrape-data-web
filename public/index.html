@@ -1,0 +1,72 @@
+﻿<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scrape Data Web</title>
+  <link rel="stylesheet" href="styles.css?v=3" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="badge">Scrape Lab</div>
+      <h1>Cào tin tức theo từ khóa</h1>
+      <p>Chọn nguồn, nhập từ khóa và khoảng thời gian. Hệ thống sẽ thu thập tiêu đề, ngày đăng, tóm tắt và URL rồi xuất JSON.</p>
+    </header>
+
+    <main class="card">
+      <form id="scrape-form" class="form">
+        <div class="field">
+          <label>Nguồn dữ liệu</label>
+          <div id="sources-list" class="sources"></div>
+          <div class="hint">Ưu tiên Vietstock, có thể mở rộng thêm nguồn khác sau.</div>
+        </div>
+
+        <div class="grid">
+          <div class="field">
+            <label for="keyword">Từ khóa</label>
+            <input id="keyword" name="keyword" type="text" placeholder="Vingroup" required />
+          </div>
+          <div class="field">
+            <label for="startDate">Từ ngày</label>
+            <input id="startDate" name="startDate" type="date" required />
+          </div>
+          <div class="field">
+            <label for="endDate">Đến ngày</label>
+            <input id="endDate" name="endDate" type="date" required />
+          </div>
+          <div class="field">
+            <label for="maxItems">Giới hạn kết quả mỗi nguồn</label>
+            <input id="maxItems" name="maxItems" type="number" min="1" placeholder="Để trống = không giới hạn" />
+          </div>
+          <div class="field">
+            <label for="format">Định dạng xuất</label>
+            <select id="format" name="format">
+              <option value="csv-utf8" selected>CSV (UTF-8 - mặc định)</option>
+              <option value="csv-utf16">CSV (UTF-16LE)</option>
+              <option value="csv">CSV (Excel ANSI)</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="primary" type="submit" id="submitBtn">Bắt đầu cào dữ liệu</button>
+        <div id="status" class="status"></div>
+      </form>
+
+      <section id="result" class="result hidden">
+        <div class="result-header">
+          <div>
+            <h2>Kết quả</h2>
+            <p id="result-meta"></p>
+          </div>
+          <a id="downloadLink" class="secondary" href="#" download>Tải CSV</a>
+        </div>
+        <pre id="result-preview"></pre>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js?v=3"></script>
+</body>
+</html>
