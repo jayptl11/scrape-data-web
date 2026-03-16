@@ -1,7 +1,9 @@
 ﻿const vietstock = require("./vietstock");
+const cafef = require("./cafef");
 
 const sources = {
-  [vietstock.id]: vietstock
+  [vietstock.id]: vietstock,
+  [cafef.id]: cafef
 };
 
 function getSourceOptions() {
