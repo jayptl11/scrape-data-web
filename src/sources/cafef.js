@@ -39,12 +39,14 @@ function extractItemsFromSearch(html) {
     const end = i + 1 < matches.length ? matches[i + 1].index : html.length;
     const block = html.slice(start, end);
 
-    const linkMatch = block.match(/<a[^>]*class="box-category-link-title"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+    const linkMatch = block.match(/<a[^>]*class="box-category-link-title"[^>]*>([\s\S]*?)<\/a>/i);
     if (!linkMatch) continue;
 
-    const href = linkMatch[1];
-    const titleAttrMatch = linkMatch[0].match(/title="([^"]+)"/i);
-    const titleRaw = titleAttrMatch ? titleAttrMatch[1] : linkMatch[2];
+    const linkTag = linkMatch[0];
+    const hrefMatch = linkTag.match(/href="([^"]+)"/i);
+    const href = hrefMatch ? hrefMatch[1] : "";
+    const titleAttrMatch = linkTag.match(/title="([^"]+)"/i);
+    const titleRaw = titleAttrMatch ? titleAttrMatch[1] : linkMatch[1];
     const title = decodeEntities(stripTags(titleRaw));
 
     const sapoMatch = block.match(/<p class="sapo"[^>]*>([\s\S]*?)<\/p>/i);

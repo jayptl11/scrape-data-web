@@ -64,6 +64,9 @@ app.post("/api/scrape", async (req, res) => {
     if (!Array.isArray(sourceIds) || sourceIds.length === 0) {
       return res.status(400).json({ error: "Vui lòng chọn ít nhất một nguồn." });
     }
+    if (sourceIds.length > 1) {
+      return res.status(400).json({ error: "Vui lòng chỉ chọn một nguồn mỗi lần." });
+    }
 
     if (!keyword || !keyword.trim()) {
       return res.status(400).json({ error: "Vui lòng nhập từ khóa." });

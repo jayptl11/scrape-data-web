@@ -21,11 +21,11 @@ async function loadSources() {
     const wrapper = document.createElement("label");
     wrapper.className = "source-item";
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.name = "sources";
-    checkbox.value = source.id;
-    checkbox.checked = index === 0;
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "source";
+    radio.value = source.id;
+    radio.checked = index === 0;
 
     const content = document.createElement("div");
     const title = document.createElement("strong");
@@ -35,16 +35,15 @@ async function loadSources() {
 
     content.appendChild(title);
     content.appendChild(desc);
-    wrapper.appendChild(checkbox);
+    wrapper.appendChild(radio);
     wrapper.appendChild(content);
     sourcesList.appendChild(wrapper);
   });
 }
 
 function getSelectedSources() {
-  return Array.from(document.querySelectorAll("input[name=\"sources\"]:checked")).map(
-    (input) => input.value
-  );
+  const selected = document.querySelector("input[name=\"source\"]:checked");
+  return selected ? [selected.value] : [];
 }
 
 function escapeCsv(value) {
