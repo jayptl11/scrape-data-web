@@ -88,6 +88,17 @@ function parseDateToMs(value) {
   return Number.isFinite(ms) ? ms : NaN;
 }
 
+function parseDateFromUrl(url) {
+  if (!url) return NaN;
+  const match = url.match(/-(\d{2})(\d{2})(\d{2})\d+\.chn/i);
+  if (!match) return NaN;
+  const year = 2000 + Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return NaN;
+  return Date.UTC(year, month, day);
+}
+
 async function fetchText(url) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -216,6 +227,10 @@ async function search({ keyword, startMs, endMs, maxItems }) {
     });
 
     const publishTimes = await mapWithConcurrency(uniquePageItems, CONCURRENCY, async (item) => {
+      const fromUrl = parseDateFromUrl(item.url);
+      if (Number.isFinite(fromUrl)) {
+        return fromUrl;
+      }
       return fetchArticleDate(item.url);
     });
 

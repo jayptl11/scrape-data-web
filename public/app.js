@@ -100,9 +100,15 @@ form.addEventListener("submit", async (event) => {
       })
     });
 
-    const payload = await res.json();
+    const rawText = await res.text();
+    let payload;
+    try {
+      payload = JSON.parse(rawText);
+    } catch (error) {
+      throw new Error(`Lỗi máy chủ (${res.status}). Vui lòng thử lại hoặc thu hẹp khoảng ngày.`);
+    }
     if (!res.ok) {
-      throw new Error(payload.error || "Lỗi không xác định.");
+      throw new Error(payload.error || `Lỗi máy chủ (${res.status}).`);
     }
 
     const formatLabel = payload.format === "csv"
