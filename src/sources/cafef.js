@@ -191,7 +191,7 @@ async function mapWithConcurrency(items, limit, worker) {
   return results;
 }
 
-async function search({ keyword, startMs, endMs, maxItems }) {
+async function search({ keyword, startMs, endMs, maxItems, onProgress }) {
   if (typeof fetch !== "function") {
     throw new Error("Fetch API is not available. Please use Node.js 18+.");
   }
@@ -258,6 +258,9 @@ async function search({ keyword, startMs, endMs, maxItems }) {
         url: item.url,
         source: "cafef"
       });
+      if (typeof onProgress === "function") {
+        onProgress(1);
+      }
 
       if (maxItems && items.length >= maxItems) {
         return items;

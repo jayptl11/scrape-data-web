@@ -1,4 +1,4 @@
-const form = document.getElementById("scrape-form");
+﻿const form = document.getElementById("scrape-form");
 const sourcesList = document.getElementById("sources-list");
 const statusEl = document.getElementById("status");
 const submitBtn = document.getElementById("submitBtn");
@@ -6,10 +6,15 @@ const resultSection = document.getElementById("result");
 const resultMeta = document.getElementById("result-meta");
 const resultPreview = document.getElementById("result-preview");
 const downloadLink = document.getElementById("downloadLink");
+let pollTimer = null;
 
 function setStatus(message, tone = "info") {
   statusEl.textContent = message;
   statusEl.dataset.tone = tone;
+}
+
+function setLoading(isLoading) {
+  statusEl.classList.toggle("loading", Boolean(isLoading));
 }
 
 async function loadSources() {
@@ -69,6 +74,56 @@ function formatPreview(items, format) {
   return JSON.stringify(preview, null, 2);
 }
 
+function renderResult(result) {
+  const formatLabel = result.format === "csv"
+    ? (result.formatLabel || "CSV")
+    : "JSON";
+
+  resultSection.classList.remove("hidden");
+  resultMeta.textContent = `Tổng cộng ${result.count} bài viết. Nguồn: ${result.meta.sources.join(", ")}. Định dạng: ${formatLabel}.`;
+  resultPreview.textContent = formatPreview(result.items, result.format);
+
+  const binaryString = window.atob(result.fileContentBase64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const mimeType = result.format === "csv" ? "text/csv" : "application/json";
+  const blob = new Blob([bytes], { type: mimeType });
+  const fileUrl = URL.createObjectURL(blob);
+
+  downloadLink.href = fileUrl;
+  downloadLink.download = result.fileName;
+  downloadLink.textContent = result.format === "csv" ? `Tải ${formatLabel}` : "Tải JSON";
+}
+
+async function pollJob(jobId) {
+  const statusRes = await fetch(`/api/scrape-status?jobId=${encodeURIComponent(jobId)}`);
+  const statusPayload = await statusRes.json();
+  if (!statusRes.ok) {
+    throw new Error(statusPayload.error || `Lỗi máy chủ (${statusRes.status}).`);
+  }
+
+  if (statusPayload.status === "running") {
+    setStatus(`Đang cào: ${statusPayload.count} bài...`, "info");
+    return false;
+  }
+
+  if (statusPayload.status === "error") {
+    setLoading(false);
+    throw new Error(statusPayload.error || "Đã xảy ra lỗi.");
+  }
+
+  if (statusPayload.status === "done") {
+    renderResult(statusPayload.result);
+    setStatus("Hoàn tất!", "success");
+    setLoading(false);
+    return true;
+  }
+
+  return false;
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const keyword = document.getElementById("keyword").value.trim();
@@ -83,11 +138,17 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+
   submitBtn.disabled = true;
-  setStatus("Đang cào dữ liệu...", "info");
+  setStatus("Đang cào: 0 bài...", "info");
+  setLoading(true);
 
   try {
-    const res = await fetch("/api/scrape", {
+    const res = await fetch("/api/scrape-start", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -100,46 +161,45 @@ form.addEventListener("submit", async (event) => {
       })
     });
 
-    const rawText = await res.text();
-    let payload;
-    try {
-      payload = JSON.parse(rawText);
-    } catch (error) {
-      throw new Error(`Lỗi máy chủ (${res.status}). Vui lòng thử lại hoặc thu hẹp khoảng ngày.`);
-    }
+    const payload = await res.json();
     if (!res.ok) {
       throw new Error(payload.error || `Lỗi máy chủ (${res.status}).`);
     }
 
-    const formatLabel = payload.format === "csv"
-      ? (payload.formatLabel || "CSV")
-      : "JSON";
-
-    resultSection.classList.remove("hidden");
-    resultMeta.textContent = `Tổng cộng ${payload.count} bài viết. Nguồn: ${payload.meta.sources.join(", ")}. Định dạng: ${formatLabel}.`;
-    resultPreview.textContent = formatPreview(payload.items, payload.format);
-
-    const binaryString = window.atob(payload.fileContentBase64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+    const jobId = payload.jobId;
+    const done = await pollJob(jobId);
+    if (done) {
+      submitBtn.disabled = false;
+      setLoading(false);
+      return;
     }
-    const mimeType = payload.format === "csv" ? "text/csv" : "application/json";
-    const blob = new Blob([bytes], { type: mimeType });
-    const fileUrl = URL.createObjectURL(blob);
 
-    downloadLink.href = fileUrl;
-    downloadLink.download = payload.fileName;
-    downloadLink.textContent = payload.format === "csv" ? `Tải ${formatLabel}` : "Tải JSON";
-
-    setStatus("Hoàn tất!", "success");
+    pollTimer = setInterval(() => {
+      pollJob(jobId)
+        .then((isDone) => {
+          if (isDone) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            submitBtn.disabled = false;
+            setLoading(false);
+          }
+        })
+        .catch((error) => {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          setStatus(error.message, "error");
+          submitBtn.disabled = false;
+          setLoading(false);
+        });
+    }, 1000);
   } catch (error) {
     setStatus(error.message, "error");
-  } finally {
     submitBtn.disabled = false;
+    setLoading(false);
   }
 });
 
 loadSources().catch(() => {
   setStatus("Không tải được danh sách nguồn.", "error");
+  setLoading(false);
 });

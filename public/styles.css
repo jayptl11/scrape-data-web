@@ -173,6 +173,18 @@ body {
   font-size: 14px;
 }
 
+.status.loading::after {
+  content: "";
+  display: inline-block;
+  width: 24px;
+  height: 12px;
+  margin-left: 8px;
+  background: radial-gradient(circle, var(--accent) 40%, transparent 41%) 0 50% / 6px 6px no-repeat,
+              radial-gradient(circle, var(--accent) 40%, transparent 41%) 50% 50% / 6px 6px no-repeat,
+              radial-gradient(circle, var(--accent) 40%, transparent 41%) 100% 50% / 6px 6px no-repeat;
+  animation: dots 1s infinite ease-in-out;
+}
+
 .result {
   margin-top: 28px;
   border-top: 1px dashed var(--stroke);
@@ -210,6 +222,12 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes dots {
+  0% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+  100% { opacity: 0.3; transform: translateY(0); }
 }
 
 @media (max-width: 640px) {

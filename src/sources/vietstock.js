@@ -21,7 +21,7 @@ function parsePublishTime(row) {
   return NaN;
 }
 
-async function search({ keyword, startMs, endMs, maxItems, pageSize = 50 }) {
+async function search({ keyword, startMs, endMs, maxItems, pageSize = 50, onProgress }) {
   if (typeof fetch !== "function") {
     throw new Error("Fetch API is not available. Please use Node.js 18+.");
   }
@@ -87,6 +87,9 @@ async function search({ keyword, startMs, endMs, maxItems, pageSize = 50 }) {
         url: urlAbsolute,
         source: "vietstock"
       });
+      if (typeof onProgress === "function") {
+        onProgress(1);
+      }
 
       if (maxItems && items.length >= maxItems) {
         return items;
