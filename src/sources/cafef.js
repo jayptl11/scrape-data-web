@@ -1,6 +1,12 @@
 ﻿const { keywordMatches } = require("../utils");
 
 const BASE_URL = "https://cafef.vn";
+const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0 Safari/537.36";
+const REQUEST_TIMEOUT_MS = 12000;
+const MAX_RETRIES = 4;
+const CONCURRENCY = 2;
+const PAGE_DELAY_MS = 400;
+const dateCache = new Map();
 
 function toAbsoluteUrl(url) {
   if (!url) return "";
@@ -83,22 +89,95 @@ function parseDateToMs(value) {
 }
 
 async function fetchText(url) {
-  const response = await fetch(url, {
-    headers: {
-      "user-agent": "Mozilla/5.0"
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "user-agent": USER_AGENT,
+        "accept-language": "vi-VN,vi;q=0.9,en;q=0.8",
+        "referer": BASE_URL + "/"
+      },
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const err = new Error(`CafeF request failed: ${response.status} ${response.statusText}`);
+      err.status = response.status;
+      throw err;
     }
-  });
-  if (!response.ok) {
-    throw new Error(`CafeF request failed: ${response.status} ${response.statusText}`);
+    return await response.text();
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return response.text();
+}
+
+async function fetchTextWithRetry(url) {
+  let lastError;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      return await fetchText(url);
+    } catch (error) {
+      lastError = error;
+      const status = error?.status;
+      if (status && status < 500 && status !== 429) {
+        break;
+      }
+      if (attempt < MAX_RETRIES) {
+        const backoff = 600 * Math.pow(2, attempt);
+        await new Promise((r) => setTimeout(r, backoff));
+      }
+    }
+  }
+  throw lastError || new Error("CafeF request failed");
 }
 
 async function fetchArticleDate(url) {
-  const html = await fetchText(url);
-  const timeValue = parsePublishTime(html);
-  const publishMs = parseDateToMs(timeValue);
-  return Number.isFinite(publishMs) ? publishMs : NaN;
+  if (dateCache.has(url)) {
+    return dateCache.get(url);
+  }
+  let lastError;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      const html = await fetchTextWithRetry(url);
+      const timeValue = parsePublishTime(html);
+      const publishMs = parseDateToMs(timeValue);
+      const result = Number.isFinite(publishMs) ? publishMs : NaN;
+      dateCache.set(url, result);
+      return result;
+    } catch (error) {
+      lastError = error;
+      const status = error?.status;
+      if (status && status < 500 && status !== 429) {
+        break;
+      }
+      if (attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
+    }
+  }
+  if (lastError) {
+    const result = NaN;
+    dateCache.set(url, result);
+    return result;
+  }
+  return NaN;
+}
+
+async function mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let index = 0;
+
+  async function run() {
+    while (index < items.length) {
+      const current = index;
+      index += 1;
+      results[current] = await worker(items[current], current);
+    }
+  }
+
+  const runners = Array.from({ length: Math.min(limit, items.length) }, () => run());
+  await Promise.all(runners);
+  return results;
 }
 
 async function search({ keyword, startMs, endMs, maxItems }) {
@@ -116,7 +195,12 @@ async function search({ keyword, startMs, endMs, maxItems }) {
       ? `${BASE_URL}/tim-kiem.chn?keywords=${encodeURIComponent(keyword)}`
       : `${BASE_URL}/tim-kiem/trang-${page}.chn?keywords=${encodeURIComponent(keyword)}`;
 
-    const html = await fetchText(pageUrl);
+    let html;
+    try {
+      html = await fetchTextWithRetry(pageUrl);
+    } catch (error) {
+      break;
+    }
     const pageItems = extractItemsFromSearch(html);
 
     if (pageItems.length === 0) break;
@@ -125,11 +209,19 @@ async function search({ keyword, startMs, endMs, maxItems }) {
     let pageNewest = 0;
     let hasDate = false;
 
-    for (const item of pageItems) {
-      if (seen.has(item.url)) continue;
+    const uniquePageItems = pageItems.filter((item) => {
+      if (seen.has(item.url)) return false;
       seen.add(item.url);
+      return true;
+    });
 
-      const publishMs = await fetchArticleDate(item.url);
+    const publishTimes = await mapWithConcurrency(uniquePageItems, CONCURRENCY, async (item) => {
+      return fetchArticleDate(item.url);
+    });
+
+    for (let i = 0; i < uniquePageItems.length; i += 1) {
+      const item = uniquePageItems[i];
+      const publishMs = publishTimes[i];
       if (!Number.isFinite(publishMs)) continue;
 
       hasDate = true;
@@ -162,6 +254,9 @@ async function search({ keyword, startMs, endMs, maxItems }) {
     }
 
     page += 1;
+    if (PAGE_DELAY_MS) {
+      await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
+    }
     safety += 1;
     if (safety > 500) break;
   }
